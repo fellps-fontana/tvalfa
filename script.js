@@ -49,10 +49,8 @@ document.addEventListener('DOMContentLoaded', () => {
     const formatarData = (dataStr) => {
         if (!dataStr || dataStr === "Ainda sem previsão") return "Ainda sem previsão";
         
-        // Se a data for "HOJE" (formato antigo), retorna "HOJE"
         if (dataStr === "HOJE") return "HOJE";
 
-        // Tenta formatar AAAA-MM-DD
         try {
             const parts = dataStr.split('-');
             if (parts.length === 3) {
@@ -62,11 +60,10 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
             }
         } catch(e) {
-            // Se falhar, só retorna a string original
             return dataStr;
         }
         
-        return dataStr; // Retorno padrão
+        return dataStr;
     };
 
     // Funções de renderização
@@ -84,9 +81,6 @@ document.addEventListener('DOMContentLoaded', () => {
     const renderTecnicos = () => {
         listaTecnicos.innerHTML = '';
         
-        // [MUDANÇA] Precisamos da data de hoje formatada para comparar
-        // Esta string de data agora é gerada dentro da lógica (processarRetornos e render)
-        // para garantir o fuso correto.
         const fusoHorario = "America/Sao_Paulo";
         const stringDataHoje = new Date().toLocaleString("sv", {
             timeZone: fusoHorario
@@ -98,7 +92,6 @@ document.addEventListener('DOMContentLoaded', () => {
             
             let dataExibicao = '';
             
-            // Lógica para exibir "HOJE"
             if (tecnico.data === stringDataHoje || tecnico.data === 'HOJE') {
                 dataExibicao = 'HOJE';
             } else if (tecnico.data) {
@@ -115,72 +108,63 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     };
 
-
-    /**
-     * =================================================================
-     * [FUNÇÃO CORRIGIDA - COM FUSO HORÁRIO FORÇADO E TYPO CORRIGIDO]
-     * =================================================================
-     */
     const processarRetornos = (listaDeTecnicos) => {
-        // 1. Forçar o Fuso Horário do Brasil (Chapecó/São Paulo)
-        const fusoHorario = "America/Sao_Paulo"; // Fuso -03
-        
-        // 2. Obter a data e hora ATUAIS nesse fuso
+        const fusoHorario = "America/Sao_Paulo"; 
         const dataAgora = new Date();
         
-        // 3. Obter a HORA ATUAL em -03 (ex: "16")
         const horaAtualString = dataAgora.toLocaleString("pt-BR", {
             hour: "2-digit",
             hour12: false,
             timeZone: fusoHorario
         });
-        // Converte para número (ex: 16)
         const horaAtual = parseInt(horaAtualString, 10); 
         
-        // 4. Obter a DATA DE HOJE (string "AAAA-MM-DD") em -03
-        // Usando 'sv' (Suécia) para obter o formato AAAA-MM-DD
         const hojeString = dataAgora.toLocaleString("sv", {
             timeZone: fusoHorario
-        }).split(" ")[0]; // "2025-11-13"
+        }).split(" ")[0]; 
 
-        
         const HORA_LIMITE = 18;
+
+        console.log(`--- DEBUGGER: HORA ATUAL: ${horaAtual} | DATA ATUAL: ${hojeString} ---`);
 
         listaDeTecnicos.forEach(tecnico => {
             
-            const dataTecnico = tecnico.data; // Pega a string do banco (ex: "2025-11-13")
+            const dataTecnico = tecnico.data; 
 
-            // Pula se não tiver data ou já estiver na Matriz
             if (!dataTecnico || tecnico.local === "Matriz") {
                 return;
             }
 
-            // --- LÓGICA DE COMPARAÇÃO COM STRINGS (SEM BUGS) ---
+            console.log(`Processando ${tecnico.nome}: Data dele = ${dataTecnico}`);
+
 
             // REGRA 1: Dados legados ("HOJE")
             if (dataTecnico === "HOJE") {
                 if (horaAtual >= HORA_LIMITE) {
-                    salvarItem('tecnicos', { local: "Matriz", data: "" }, tecnico.id);
+                    console.log(`AÇÃO (Regra 1): Movendo ${tecnico.nome} para Matriz.`);
+                    // *** MUDANÇA AQUI ***
+                    salvarItem('tecnicos_v2', { local: "Matriz", data: "" }, tecnico.id);
                 }
             }
             
-            // REGRA 2: Data de HOJE (ex: "2025-11-13" === "2025-11-13")
-            // [TYPO CORRIGIDO: dataTecnico, sem 's']
+            // REGRA 2: Data de HOJE
             else if (dataTecnico === hojeString) {
-                if (horaAtual >= HORA_LIMITE) { // Agora vai comparar 17 >= 18 (Falso)
-                    // Só processa se for 18h ou mais
-                    salvarItem('tecnicos', { local: "Matriz", data: "" }, tecnico.id);
+                
+                console.log(`CHECANDO REGRA 2 (HOJE): ${horaAtual} >= ${HORA_LIMITE}? ${horaAtual >= HORA_LIMITE}`);
+
+                if (horaAtual >= HORA_LIMITE) { 
+                    console.log(`AÇÃO (Regra 2): Movendo ${tecnico.nome} para Matriz.`);
+                    // *** MUDANÇA AQUI ***
+                    salvarItem('tecnicos_v2', { local: "Matriz", data: "" }, tecnico.id);
                 }
             }
             
-            // REGRA 3: Datas passadas (ex: "2025-11-12" < "2025-11-13")
+            // REGRA 3: Datas passadas
             else if (dataTecnico < hojeString) {
-                // Processa imediatamente
-                salvarItem('tecnicos', { local: "Matriz", data: "" }, tecnico.id);
+                console.log(`AÇÃO (Regra 3): Movendo ${tecnico.nome} para Matriz (Data passada).`);
+                // *** MUDANÇA AQUI ***
+                salvarItem('tecnicos_v2', { local: "Matriz", data: "" }, tecnico.id);
             }
-            
-            // REGRA 4: Datas futuras (ex: "2025-11-14" > "2025-11-13")
-            // Não faz nada.
         });
     }
 
@@ -195,42 +179,26 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     };
 
-    /**
-     * =================================================================
-     * Lógica para preencher o input de Data de Retorno
-     * [CORRIGIDA - COM FUSO HORÁRIO FORÇADO]
-     * =================================================================
-     */
     const toggleRetornaHoje = () => {
-        const checked = retornaHojeCheckbox.checked;
+        const localAtual = document.getElementById('localizacao-tecnico').value;
+        console.log(`[DEBUG CHECKBOX] Cliquei no checkbox. O local AGORA é: ${localAtual}`);
 
-        // 1. Forçar o Fuso Horário do Brasil
+        const checked = retornaHojeCheckbox.checked;
         const fusoHorario = "America/Sao_Paulo";
         
-        // 2. Obter a data de HOJE (string "AAAA-MM-DD") nesse fuso
-        // Usando 'sv' (Suécia) para obter o formato AAAA-MM-DD
         const stringDataHoje = new Date().toLocaleString("sv", {
             timeZone: fusoHorario
-        }).split(" ")[0]; // "2025-11-13"
+        }).split(" ")[0];
 
         if (checked) {
-            // Se marcada, preenche a data com o dia de hoje e desabilita o input
             dataRetornoInput.value = stringDataHoje;
             dataRetornoInput.disabled = true;
         } else {
-            // Se desmarcada, limpa o valor e habilita o input
             dataRetornoInput.value = "";
             dataRetornoInput.disabled = false;
         }
     };
 
-
-    /**
-     * =================================================================
-     * [FUNÇÃO CORRIGIDA - COM FUSO HORÁRIO FORÇADO]
-     * Atualizada para ler a data de hoje no fuso correto ao abrir o modal
-     * =================================================================
-     */
     const openModal = (type, docId = null) => {
         editType = type;
         editDocId = docId;
@@ -243,14 +211,12 @@ document.addEventListener('DOMContentLoaded', () => {
         form.reset();
         btnExcluir.style.display = 'none';
 
-        // Lógica de reset/estado inicial para Unidade
         if (type === 'unidade') {
             semPrevisaoCheckbox.checked = false;
             previsaoInicioInput.disabled = false;
             previsaoFimInput.disabled = false;
         }
         
-        // Lógica de reset/estado inicial para Técnico
         if (type === 'tecnico') {
             retornaHojeCheckbox.checked = false;
             dataRetornoInput.disabled = false;
@@ -284,28 +250,20 @@ document.addEventListener('DOMContentLoaded', () => {
                 const item = tecnicos.find(t => t.id === docId);
                 document.getElementById('nome-tecnico').value = item.nome;
                 document.getElementById('localizacao-tecnico').value = item.local;
-
-                // *** [MUDANÇA] LÓGICA DE EDIÇÃO PARA RETORNA HOJE (COM FUSO) ***
                 
-                // 1. Obtém a string da data de hoje (AAAA-MM-DD) no fuso correto
                 const fusoHorario = "America/Sao_Paulo";
                 const stringDataHoje = new Date().toLocaleString("sv", {
                     timeZone: fusoHorario
                 }).split(" ")[0];
 
-                // 2. Verifica se a data salva é a data de hoje
                 if (item.data === "HOJE" || item.data === stringDataHoje) {
                     retornaHojeCheckbox.checked = true;
                 } else {
                     retornaHojeCheckbox.checked = false;
                 }
 
-                // 3. Aplica o estado do checkbox
-                // (Se checked=true, vai preencher com a data de hoje e desabilitar)
                 toggleRetornaHoje();
 
-                // 4. Se o checkbox NÃO estiver marcado (ou seja, é uma data específica)
-                // define o valor do input para a data que veio do banco.
                 if (!retornaHojeCheckbox.checked) {
                     dataRetornoInput.value = item.data || "";
                 }
@@ -314,7 +272,6 @@ document.addEventListener('DOMContentLoaded', () => {
         } else { // Modal de Novo Cadastro
             modalTitle.textContent = `Cadastrar Novo ${type === 'unidade' ? 'Unidade' : 'Técnico'}`;
             
-            // Garante o estado inicial correto ao abrir para novo técnico
             if (type === 'tecnico') {
                 retornaHojeCheckbox.checked = false;
                 dataRetornoInput.disabled = false;
@@ -399,23 +356,19 @@ document.addEventListener('DOMContentLoaded', () => {
         console.error("Erro ao ouvir a coleção 'unidades':", error);
     });
 
-    db.collection('tecnicos').onSnapshot(snapshot => {
+    // *** MUDANÇA AQUI ***
+    db.collection('tecnicos_v2').onSnapshot(snapshot => {
         tecnicos = snapshot.docs.map(doc => ({
             id: doc.id,
             ...doc.data()
         }));
         
-        // *** [MUDANÇA APLICADA AQUI] ***
-        // Chama a nova função de processamento (com fuso e typo corrigidos)
         processarRetornos(tecnicos);
         
-        // O renderTecnicos é chamado DEPOIS do processarRetornos
-        // Se o processarRetornos alterar um item, o snapshot
-        // vai disparar de novo e o render vai mostrar o estado
-        // mais atualizado (já como "Matriz").
         renderTecnicos();
     }, error => {
-        console.error("Erro ao ouvir a coleção 'tecnicos':", error);
+        // *** MUDANÇA AQUI (SÓ NO LOG DE ERRO) ***
+        console.error("Erro ao ouvir a coleção 'tecnicos_v2':", error);
     });
 
     // Event Listeners
@@ -463,22 +416,23 @@ document.addEventListener('DOMContentLoaded', () => {
         closeModal('unidade');
     });
 
-    formTecnico.addEventListener('submit', async (e) => {
-        e.preventDefault();
-        
-        // Pega o valor do input de data (que já foi preenchido pelo
-        // toggleRetornaHoje() se o checkbox estava marcado)
-        let dataValor = dataRetornoInput.value;
+formTecnico.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            let dataValor = dataRetornoInput.value;
 
-        const dados = {
-            nome: document.getElementById('nome-tecnico').value,
-            local: document.getElementById('localizacao-tecnico').value,
-            data: dataValor
-        };
-        
-        await salvarItem('tecnicos', dados, editDocId);
-        closeModal('tecnico');
-    });
+            const dados = {
+                  nome: document.getElementById('nome-tecnico').value,
+                  local: document.getElementById('localizacao-tecnico').value,
+                  data: dataValor
+            };
+
+            console.log("--- DEBUGGER: ENVIANDO PARA O FIREBASE ---", dados);
+            
+            // *** MUDANÇA AQUI ***
+            await salvarItem('tecnicos_v2', dados, editDocId);
+            closeModal('tecnico');
+      });
 
     btnExcluirUnidade.addEventListener('click', async () => {
         if (editDocId !== null) {
@@ -492,7 +446,8 @@ document.addEventListener('DOMContentLoaded', () => {
     btnExcluirTecnico.addEventListener('click', async () => {
         if (editDocId !== null) {
             if (confirm("Tem certeza que deseja excluir este Técnico?")) {
-                await excluirItem('tecnicos', editDocId);
+                // *** MUDANÇA AQUI ***
+                await excluirItem('tecnicos_v2', editDocId);
                 closeModal('tecnico');
             }
         }
